@@ -220,6 +220,83 @@
     color: var(--node);
   }
 
+  /* title screen overlay */
+  #title-overlay {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 300;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 0;
+  }
+  #title-overlay.hidden { display: none; }
+
+  .title-logo {
+    font-family: var(--display);
+    font-size: clamp(36px, 10vw, 72px);
+    font-weight: 900;
+    letter-spacing: 0.15em;
+    color: var(--node);
+    text-shadow: 0 0 30px var(--node-glow), 0 0 80px var(--node-glow);
+    text-align: center;
+    animation: flicker 4s infinite;
+  }
+  @keyframes flicker {
+    0%,95%,100% { opacity: 1; }
+    96% { opacity: 0.6; }
+    97% { opacity: 1; }
+    98% { opacity: 0.4; }
+  }
+  .title-sub {
+    font-family: var(--mono);
+    font-size: clamp(10px, 2vw, 13px);
+    letter-spacing: 0.4em;
+    color: #4a6080;
+    margin-top: 8px;
+    margin-bottom: 40px;
+    text-align: center;
+  }
+  .title-desc {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: #6080a0;
+    text-align: center;
+    line-height: 2;
+    margin-bottom: 40px;
+    letter-spacing: 0.05em;
+  }
+  .title-desc span { color: var(--player); }
+  .title-desc span.enemy { color: var(--enemy); }
+  .title-desc span.goal { color: var(--goal); }
+  .btn-start {
+    font-family: var(--display);
+    font-size: 13px;
+    letter-spacing: 0.3em;
+    padding: 14px 40px;
+    border: 1px solid var(--node);
+    background: transparent;
+    color: var(--node);
+    border-radius: 3px;
+    cursor: pointer;
+    animation: pulse-start 1.5s ease-in-out infinite;
+  }
+  .btn-start:hover { background: rgba(79,195,247,0.15); }
+  @keyframes pulse-start {
+    0%,100% { box-shadow: 0 0 8px var(--node-glow); }
+    50%      { box-shadow: 0 0 28px var(--node-glow), 0 0 60px var(--node-glow); }
+  }
+  .title-stage-info {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: #3a5070;
+    margin-top: 20px;
+    letter-spacing: 0.2em;
+    text-align: center;
+  }
+
   /* all-clear overlay */
   #allclear-overlay {
     display: none;
@@ -312,6 +389,19 @@
       <button id="btn-restart-default" class="btn" onclick="restartStage()" style="width:100%">RESTART</button>
     </div>
   </div>
+</div>
+
+<!-- Title Screen -->
+<div id="title-overlay">
+  <div class="title-logo">NET ESCAPE</div>
+  <div class="title-sub">// グリッド脱出ゲーム //</div>
+  <div class="title-desc">
+    <span>A</span>（あなた）を操作してゴール <span class="goal">G</span> を目指せ。<br>
+    追跡者 <span class="enemy">B</span> に捕まったらゲームオーバー。<br>
+    AとBは交互に動く。Bの動きを読め。
+  </div>
+  <button class="btn-start" onclick="startGame()">▶ GAME START</button>
+  <div class="title-stage-info">全3ステージ</div>
 </div>
 
 <!-- All Clear Overlay -->
@@ -679,7 +769,10 @@ function setMessage(msg,cls) {
 }
 
 // ===== 起動 =====
-startFromStage(0);
+function startGame() {
+  document.getElementById('title-overlay').classList.add('hidden');
+  startFromStage(0);
+}
 </script>
 </body>
 </html>
