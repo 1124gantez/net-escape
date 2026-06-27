@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NET ESCAPE // グリッド脱出</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0e1a;
+    --bg2: #0d1424;
+    --node: #4fc3f7;
+    --node-glow: rgba(79,195,247,0.4);
+    --player: #00e676;
+    --player-glow: rgba(0,230,118,0.5);
+    --enemy: #ff1744;
+    --enemy-glow: rgba(255,23,68,0.5);
+    --goal: #ffd600;
+    --goal-glow: rgba(255,214,0,0.5);
+    --line: #1e3a5f;
+    --line-active: #2a5f8f;
+    --text: #b0c4de;
+    --mono: 'Share Tech Mono', monospace;
+    --display: 'Orbitron', monospace;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 12px 16px 24px;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.08) 2px,rgba(0,0,0,0.08) 4px);
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-size: clamp(18px, 4vw, 28px);
+    font-weight: 900;
+    letter-spacing: 0.2em;
+    color: var(--node);
+    text-shadow: 0 0 20px var(--node-glow), 0 0 40px var(--node-glow);
+    margin-bottom: 4px;
+    text-align: center;
+  }
+
+  .subtitle {
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    color: #4a6080;
+    margin-bottom: 16px;
+    text-align: center;
+  }
+
+  .game-wrap {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+    max-width: 720px;
+  }
+
+  canvas {
+    background: var(--bg2);
+    border: 1px solid var(--line-active);
+    border-radius: 4px;
+    box-shadow: 0 0 30px rgba(79,195,247,0.1), inset 0 0 60px rgba(0,0,0,0.5);
+    cursor: pointer;
+    display: block;
+    max-width: min(480px, 90vw);
+    max-height: min(480px, 90vw);
+    width: min(480px, 90vw);
+    height: min(480px, 90vw);
+  }
+
+  .sidebar {
+    width: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  .panel {
+    background: var(--bg2);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 12px;
+  }
+
+  .panel-title {
+    font-family: var(--display);
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    color: #4a6080;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    margin-bottom: 6px;
+    color: #8aa0b8;
+  }
+
+  .dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .dot-player { background: var(--player); box-shadow: 0 0 8px var(--player-glow); }
+  .dot-enemy  { background: var(--enemy);  box-shadow: 0 0 8px var(--enemy-glow); }
+  .dot-goal   { background: var(--goal);   box-shadow: 0 0 8px var(--goal-glow); }
+  .dot-node   { background: var(--node);   box-shadow: 0 0 6px var(--node-glow); }
+
+  .status-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    margin-bottom: 4px;
+    color: #8aa0b8;
+  }
+
+  .status-val {
+    font-family: var(--display);
+    font-size: 11px;
+    color: var(--node);
+  }
+
+  #turn-indicator {
+    font-family: var(--display);
+    font-size: 11px;
+    padding: 6px 10px;
+    border-radius: 3px;
+    text-align: center;
+    letter-spacing: 0.1em;
+    transition: background 0.2s, color 0.2s;
+  }
+  #turn-indicator.player-turn { background: rgba(0,230,118,0.1); color: var(--player); border: 1px solid rgba(0,230,118,0.3); }
+  #turn-indicator.enemy-turn  { background: rgba(255,23,68,0.1);  color: var(--enemy);  border: 1px solid rgba(255,23,68,0.3); }
+
+  .btn {
+    font-family: var(--display);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    padding: 8px 14px;
+    border: 1px solid var(--node);
+    background: transparent;
+    color: var(--node);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.2s, box-shadow 0.2s;
+    width: 100%;
+  }
+  .btn:hover { background: rgba(79,195,247,0.1); box-shadow: 0 0 12px var(--node-glow); }
+
+  .btn-next {
+    font-family: var(--display);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    padding: 10px 14px;
+    border: 1px solid var(--goal);
+    background: rgba(255,214,0,0.08);
+    color: var(--goal);
+    border-radius: 3px;
+    cursor: pointer;
+    width: 100%;
+    animation: pulse-gold 1.2s ease-in-out infinite;
+    transition: background 0.2s, box-shadow 0.2s;
+  }
+  .btn-next:hover { background: rgba(255,214,0,0.18); box-shadow: 0 0 16px var(--goal-glow); }
+
+  @keyframes pulse-gold {
+    0%,100% { box-shadow: 0 0 6px var(--goal-glow); }
+    50%      { box-shadow: 0 0 20px var(--goal-glow); }
+  }
+
+  #message-box {
+    font-size: 11px;
+    line-height: 1.6;
+    color: #8aa0b8;
+    min-height: 40px;
+  }
+  #message-box.win  { color: var(--goal); }
+  #message-box.lose { color: var(--enemy); }
+
+  .dist-bar-wrap { margin-top: 4px; }
+  .dist-bar-bg { height: 4px; background: var(--line); border-radius: 2px; margin-top: 4px; }
+  .dist-bar-fill { height: 100%; border-radius: 2px; background: var(--enemy); transition: width 0.3s; }
+
+  /* stage badge */
+  #stage-badge {
+    font-family: var(--display);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: #4a6080;
+    text-align: center;
+    margin-bottom: 10px;
+  }
+  #stage-badge span {
+    color: var(--node);
+  }
+
+  /* all-clear overlay */
+  #allclear-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(10,14,26,0.92);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 20px;
+  }
+  #allclear-overlay.show { display: flex; }
+  #allclear-overlay h2 {
+    font-family: var(--display);
+    font-size: clamp(22px, 5vw, 40px);
+    font-weight: 900;
+    color: var(--goal);
+    text-shadow: 0 0 30px var(--goal-glow), 0 0 60px var(--goal-glow);
+    letter-spacing: 0.2em;
+    text-align: center;
+  }
+  #allclear-overlay p {
+    font-size: 13px;
+    color: var(--text);
+    letter-spacing: 0.1em;
+    text-align: center;
+  }
+  #allclear-overlay .btn-restart {
+    font-family: var(--display);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    padding: 12px 28px;
+    border: 1px solid var(--goal);
+    background: rgba(255,214,0,0.08);
+    color: var(--goal);
+    border-radius: 3px;
+    cursor: pointer;
+    animation: pulse-gold 1.2s ease-in-out infinite;
+  }
+  #allclear-overlay .btn-restart:hover { background: rgba(255,214,0,0.2); }
+
+  @media (max-width: 600px) {
+    .sidebar { width: 100%; max-width: min(480px, 90vw); }
+  }
+</style>
+</head>
+<body>
+
+<h1>NET ESCAPE</h1>
+<div id="stage-badge">STAGE 1 / 3</div>
+
+<div class="game-wrap" style="margin-top:8px">
+  <canvas id="canvas" width="480" height="480"></canvas>
+
+  <div class="sidebar">
+    <div class="panel">
+      <div class="panel-title">LEGEND</div>
+      <div class="legend-item"><div class="dot dot-player"></div> YOU (A)</div>
+      <div class="legend-item"><div class="dot dot-enemy"></div> CHASER (B)</div>
+      <div class="legend-item"><div class="dot dot-goal"></div> GOAL</div>
+      <div class="legend-item"><div class="dot dot-node"></div> NODE</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">STATUS</div>
+      <div id="turn-indicator" class="player-turn">PLAYER TURN</div>
+      <div style="margin-top:10px">
+        <div class="status-row"><span>TURN</span><span class="status-val" id="turn-count">1</span></div>
+        <div class="status-row"><span>DIST TO GOAL</span><span class="status-val" id="dist-goal">—</span></div>
+        <div class="status-row"><span>ENEMY DIST</span><span class="status-val" id="dist-enemy">—</span></div>
+        <div class="dist-bar-wrap">
+          <div style="font-size:10px;color:#4a6080;">DANGER LEVEL</div>
+          <div class="dist-bar-bg"><div class="dist-bar-fill" id="danger-bar" style="width:0%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">MESSAGE</div>
+      <div id="message-box">隣接するノードをクリックして移動してください。</div>
+    </div>
+
+    <div id="btn-area">
+      <button id="btn-next"    class="btn-next" onclick="nextStage()"        style="display:none;width:100%">▶ NEXT STAGE</button>
+      <div id="btn-next-gap"  style="display:none;height:6px"></div>
+      <button id="btn-retry"  class="btn"       onclick="restartStage()"    style="display:none;width:100%">↺ このステージからやり直す</button>
+      <div id="btn-retry-gap" style="display:none;height:6px"></div>
+      <button id="btn-stage1" class="btn"       onclick="startFromStage(0)" style="display:none;width:100%;color:#8aa0b8;border-color:#3a5070">« ステージ1から始める</button>
+      <button id="btn-restart-default" class="btn" onclick="restartStage()" style="width:100%">RESTART</button>
+    </div>
+  </div>
+</div>
+
+<!-- All Clear Overlay -->
+<div id="allclear-overlay">
+  <h2>ALL CLEAR!</h2>
+  <p>全ステージクリア！おめでとうございます。</p>
+  <button class="btn-restart" onclick="startFromStage(0)">PLAY AGAIN</button>
+</div>
+
+<script>
+// ===== ステージ定義 =====
+const STAGES = [
+  // ---- STAGE 1: シンプル（19ノード） ----
+  {
+    label: 'STAGE 1 — INTRO',
+    nodes: [
+      {id:0,x:0.10,y:0.15},{id:1,x:0.30,y:0.08},{id:2,x:0.50,y:0.15},
+      {id:3,x:0.20,y:0.30},{id:4,x:0.40,y:0.30},{id:5,x:0.65,y:0.25},
+      {id:6,x:0.85,y:0.15},{id:7,x:0.10,y:0.55},{id:8,x:0.30,y:0.55},
+      {id:9,x:0.55,y:0.50},{id:10,x:0.75,y:0.50},{id:11,x:0.90,y:0.40},
+      {id:12,x:0.20,y:0.80},{id:13,x:0.45,y:0.80},{id:14,x:0.70,y:0.82},
+      {id:15,x:0.88,y:0.75},{id:16,x:0.10,y:0.90},{id:17,x:0.50,y:0.95},
+      {id:18,x:0.80,y:0.95},
+    ],
+    edges: [
+      [0,1],[1,2],[0,3],[1,3],[1,4],[2,4],[2,5],[5,6],[4,5],[3,4],
+      [3,7],[7,8],[8,3],[8,4],[4,9],[5,9],[9,10],[10,11],[6,11],[5,10],
+      [7,12],[8,12],[8,13],[9,13],[13,14],[14,15],[10,15],[11,15],
+      [12,16],[12,13],[13,17],[14,17],[17,18],[15,18],[16,17],
+    ],
+    playerStart: 0,
+    enemyStart: 18,
+    goal: 15,
+    aiStrength: 0.3,
+  },
+  // ---- STAGE 2: 中規模・複雑（22ノード） ----
+  {
+    label: 'STAGE 2 — TANGLE',
+    nodes: [
+      {id:0, x:0.50,y:0.05},
+      {id:1, x:0.15,y:0.15},{id:2, x:0.50,y:0.18},{id:3, x:0.85,y:0.15},
+      {id:4, x:0.05,y:0.35},{id:5, x:0.30,y:0.35},{id:6, x:0.55,y:0.35},{id:7, x:0.78,y:0.30},{id:8, x:0.95,y:0.35},
+      {id:9, x:0.15,y:0.55},{id:10,x:0.40,y:0.55},{id:11,x:0.65,y:0.55},{id:12,x:0.88,y:0.55},
+      {id:13,x:0.05,y:0.75},{id:14,x:0.28,y:0.75},{id:15,x:0.52,y:0.75},{id:16,x:0.75,y:0.75},{id:17,x:0.95,y:0.75},
+      {id:18,x:0.15,y:0.92},{id:19,x:0.40,y:0.92},{id:20,x:0.65,y:0.92},{id:21,x:0.88,y:0.92},
+    ],
+    edges: [
+      [0,1],[0,2],[0,3],
+      [1,4],[1,5],[2,5],[2,6],[3,7],[3,8],
+      [4,9],[5,9],[5,10],[6,10],[6,11],[7,11],[7,12],[8,12],
+      [9,13],[9,14],[10,14],[10,15],[11,15],[11,16],[12,16],[12,17],
+      [13,18],[14,18],[14,19],[15,19],[15,20],[16,20],[16,21],[17,21],
+      [18,19],[19,20],[20,21],
+      // cross-links for complexity
+      [4,13],[8,17],[5,14],[7,16],[2,10],[6,15],
+    ],
+    playerStart: 0,
+    enemyStart: 20,
+    goal: 21,
+    aiStrength: 0.5,
+  },
+  // ---- STAGE 3: 高難度（24ノード、敵が強い） ----
+  {
+    label: 'STAGE 3 — FINAL',
+    nodes: [
+      {id:0, x:0.50,y:0.05},
+      {id:1, x:0.20,y:0.12},{id:2, x:0.80,y:0.12},
+      {id:3, x:0.05,y:0.28},{id:4, x:0.35,y:0.25},{id:5, x:0.65,y:0.25},{id:6, x:0.95,y:0.28},
+      {id:7, x:0.15,y:0.45},{id:8, x:0.40,y:0.42},{id:9, x:0.60,y:0.42},{id:10,x:0.85,y:0.45},
+      {id:11,x:0.05,y:0.62},{id:12,x:0.28,y:0.60},{id:13,x:0.50,y:0.58},{id:14,x:0.72,y:0.60},{id:15,x:0.95,y:0.62},
+      {id:16,x:0.15,y:0.78},{id:17,x:0.38,y:0.78},{id:18,x:0.62,y:0.78},{id:19,x:0.85,y:0.78},
+      {id:20,x:0.05,y:0.93},{id:21,x:0.30,y:0.93},{id:22,x:0.60,y:0.93},{id:23,x:0.90,y:0.93},
+    ],
+    edges: [
+      [0,1],[0,2],[1,3],[1,4],[2,5],[2,6],
+      [3,7],[4,7],[4,8],[5,8],[5,9],[6,9],[6,10],
+      [7,11],[7,12],[8,12],[8,13],[9,13],[9,14],[10,14],[10,15],
+      [11,16],[12,16],[12,17],[13,17],[13,18],[14,18],[14,19],[15,19],
+      [16,20],[16,21],[17,21],[17,22],[18,22],[18,23],[19,23],
+      [20,21],[21,22],[22,23],
+      // shortcuts that create traps
+      [3,11],[6,15],[4,12],[5,14],[8,17],[9,18],
+    ],
+    playerStart: 0,
+    enemyStart: 23,
+    goal: 22,
+    aiStrength: 0.8,
+  },
+];
+
+// ===== グローバル状態 =====
+let currentStage = 0;
+let stageData, adjMap;
+let playerPos, enemyPos, goalPos, turn, turnCount, gameOver;
+
+const CANVAS_W = 480, CANVAS_H = 480, PAD = 28;
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let pulseT = 0, animFrame;
+
+// ===== グラフユーティリティ =====
+function buildAdj(nodes, edges) {
+  const a = {};
+  nodes.forEach(n => a[n.id] = []);
+  edges.forEach(([u,v]) => { a[u].push(v); a[v].push(u); });
+  return a;
+}
+
+function bfsDist(src, adj, nodes) {
+  const dist = {};
+  nodes.forEach(n => dist[n.id] = Infinity);
+  dist[src] = 0;
+  const q = [src];
+  while (q.length) {
+    const u = q.shift();
+    adj[u].forEach(v => { if (dist[v] === Infinity) { dist[v] = dist[u]+1; q.push(v); } });
+  }
+  return dist;
+}
+
+function nodeXY(id) {
+  const n = stageData.nodes[id];
+  return { x: PAD + n.x*(CANVAS_W-PAD*2), y: PAD + n.y*(CANVAS_H-PAD*2) };
+}
+
+// ===== 初期化 =====
+function startFromStage(idx) {
+  document.getElementById('allclear-overlay').classList.remove('show');
+  currentStage = idx;
+  loadStage(idx);
+}
+
+function loadStage(idx) {
+  stageData = STAGES[idx];
+  adjMap = buildAdj(stageData.nodes, stageData.edges);
+
+  playerPos = stageData.playerStart;
+  enemyPos  = stageData.enemyStart;
+  goalPos   = stageData.goal;
+  turn      = 'player';
+  turnCount = 1;
+  gameOver  = false;
+
+  document.getElementById('turn-count').textContent = 1;
+  document.getElementById('stage-badge').textContent = `STAGE ${idx + 1} / ${STAGES.length}`;
+  setMessage('隣接するノードをクリックして移動してください。', '');
+  setTurnUI('player');
+  updateBtnArea('playing');
+  updateStats();
+  draw();
+}
+
+function restartStage() { loadStage(currentStage); }
+
+function nextStage() {
+  const next = currentStage + 1;
+  if (next >= STAGES.length) {
+    document.getElementById('allclear-overlay').classList.add('show');
+  } else {
+    currentStage = next;
+    loadStage(next);
+  }
+}
+
+// ===== ボタンエリア更新 =====
+function updateBtnArea(result) {
+  // result: 'win' | 'lose' | 'playing'
+  const btnNext           = document.getElementById('btn-next');
+  const btnNextGap        = document.getElementById('btn-next-gap');
+  const btnRetry          = document.getElementById('btn-retry');
+  const btnRetryGap       = document.getElementById('btn-retry-gap');
+  const btnStage1         = document.getElementById('btn-stage1');
+  const btnRestartDefault = document.getElementById('btn-restart-default');
+
+  // 全リセット
+  btnNext.style.display           = 'none';
+  btnNextGap.style.display        = 'none';
+  btnRetry.style.display          = 'none';
+  btnRetryGap.style.display       = 'none';
+  btnStage1.style.display         = 'none';
+  btnRestartDefault.style.display = 'none';
+
+  if (result === 'win') {
+    const isLast = currentStage >= STAGES.length - 1;
+    btnNext.textContent  = isLast ? '🏆 FINAL CLEAR!' : '▶ NEXT STAGE';
+    btnNext.style.display    = 'block';
+    btnNextGap.style.display = 'block';
+    btnRetry.textContent     = 'RETRY THIS STAGE';
+    btnRetry.style.display   = 'block';
+  } else if (result === 'lose') {
+    btnRetry.textContent     = '↺ このステージからやり直す';
+    btnRetry.style.display   = 'block';
+    if (currentStage > 0) {
+      btnRetryGap.style.display = 'block';
+      btnStage1.style.display   = 'block';
+    }
+  } else {
+    // playing
+    btnRestartDefault.style.display = 'block';
+  }
+}
+
+// ===== 描画 =====
+function draw() {
+  cancelAnimationFrame(animFrame);
+  pulseT += 0.04;
+  ctx.clearRect(0,0,CANVAS_W,CANVAS_H);
+
+  // dot grid
+  ctx.fillStyle = 'rgba(30,58,95,0.15)';
+  for (let x=20;x<CANVAS_W;x+=24)
+    for (let y=20;y<CANVAS_H;y+=24)
+      ctx.fillRect(x,y,1,1);
+
+  // edges
+  stageData.edges.forEach(([a,b]) => {
+    const pa=nodeXY(a),pb=nodeXY(b);
+    ctx.beginPath(); ctx.moveTo(pa.x,pa.y); ctx.lineTo(pb.x,pb.y);
+    ctx.strokeStyle='#1e3a5f'; ctx.lineWidth=1.5; ctx.stroke();
+  });
+
+  // reachable highlight
+  if (turn==='player' && !gameOver) {
+    adjMap[playerPos].forEach(id => {
+      const pa=nodeXY(playerPos),pb=nodeXY(id);
+      ctx.beginPath(); ctx.moveTo(pa.x,pa.y); ctx.lineTo(pb.x,pb.y);
+      ctx.strokeStyle='rgba(0,230,118,0.35)'; ctx.lineWidth=2.5; ctx.stroke();
+    });
+  }
+
+  // nodes
+  stageData.nodes.forEach(n => {
+    const {x,y}=nodeXY(n.id);
+    const isGoal=n.id===goalPos, isPlayer=n.id===playerPos, isEnemy=n.id===enemyPos;
+    const isReachable=!gameOver && turn==='player' && adjMap[playerPos].includes(n.id);
+
+    if (isGoal) {
+      const pulse=0.5+0.5*Math.sin(pulseT*2);
+      const r=18+pulse*6;
+      const g=ctx.createRadialGradient(x,y,0,x,y,r);
+      g.addColorStop(0,'rgba(255,214,0,0.3)'); g.addColorStop(1,'rgba(255,214,0,0)');
+      ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fillStyle=g; ctx.fill();
+    }
+    if (isReachable) {
+      ctx.beginPath(); ctx.arc(x,y,13,0,Math.PI*2);
+      ctx.fillStyle='rgba(0,230,118,0.1)'; ctx.fill();
+      ctx.strokeStyle='rgba(0,230,118,0.5)'; ctx.lineWidth=1; ctx.stroke();
+    }
+
+    const r=isPlayer||isEnemy?10:isGoal?9:5;
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+    if (isPlayer) {
+      ctx.fillStyle='#00e676'; ctx.shadowColor='#00e676'; ctx.shadowBlur=18;
+    } else if (isEnemy) {
+      const ep=0.5+0.5*Math.sin(pulseT*3);
+      ctx.fillStyle='#ff1744'; ctx.shadowColor='#ff1744'; ctx.shadowBlur=12+ep*10;
+    } else if (isGoal) {
+      ctx.fillStyle='#ffd600'; ctx.shadowColor='#ffd600'; ctx.shadowBlur=14;
+    } else {
+      ctx.fillStyle='#4fc3f7'; ctx.shadowColor='#4fc3f7'; ctx.shadowBlur=6;
+    }
+    ctx.fill(); ctx.shadowBlur=0;
+
+    if (isPlayer||isEnemy||isGoal) {
+      ctx.fillStyle=isPlayer?'#000':isEnemy?'#fff':'#000';
+      ctx.font=`bold 9px "Share Tech Mono"`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(isPlayer?'A':isEnemy?'B':'G',x,y);
+    }
+  });
+
+  if (!gameOver) animFrame=requestAnimationFrame(draw);
+}
+
+// ===== クリック =====
+canvas.addEventListener('click', e => {
+  if (gameOver || turn!=='player') return;
+  const rect=canvas.getBoundingClientRect();
+  const mx=(e.clientX-rect.left)*(CANVAS_W/rect.width);
+  const my=(e.clientY-rect.top)*(CANVAS_H/rect.height);
+
+  let best=null, bestD=Infinity;
+  stageData.nodes.forEach(n => {
+    const {x,y}=nodeXY(n.id);
+    const d=Math.hypot(mx-x,my-y);
+    if (d<bestD){bestD=d;best=n.id;}
+  });
+  if (best===null||bestD>30) return;
+  if (!adjMap[playerPos].includes(best)) {
+    setMessage('そのノードには移動できません。隣接ノードを選んでください。','');
+    return;
+  }
+
+  playerPos=best;
+  checkWinLose();
+  if (!gameOver) {
+    turn='enemy'; setTurnUI('enemy'); updateStats(); draw();
+    setTimeout(enemyMove, 600);
+  }
+});
+
+// ===== 敵AI =====
+function enemyMove() {
+  if (gameOver) return;
+  const strength=stageData.aiStrength;
+  const distToPlayer=bfsDist(playerPos,adjMap,stageData.nodes);
+  const distToGoal=bfsDist(goalPos,adjMap,stageData.nodes);
+
+  let best=null, bestScore=Infinity;
+  adjMap[enemyPos].forEach(v => {
+    // 追跡 + ゴール遮断の混合
+    const chase=distToPlayer[v];
+    const block=distToGoal[v] < 3 ? (3-distToGoal[v]) : 0;
+    const score=chase - strength * block;
+    if (score<bestScore){bestScore=score;best=v;}
+  });
+
+  if (best!==null) enemyPos=best;
+  turnCount++;
+  document.getElementById('turn-count').textContent=turnCount;
+
+  checkWinLose();
+  if (!gameOver) {
+    turn='player'; setTurnUI('player'); updateStats();
+    setMessage('あなたの番です。移動先を選んでください。','');
+    draw();
+  }
+}
+
+// ===== 勝敗判定 =====
+function checkWinLose() {
+  if (playerPos===enemyPos) {
+    gameOver=true;
+    setMessage('捕まった！ゲームオーバー。やり直しますか？','lose');
+    updateBtnArea('lose');
+    draw();
+  } else if (playerPos===goalPos) {
+    gameOver=true;
+    const isLast=currentStage>=STAGES.length-1;
+    setMessage(isLast?'全ステージクリア！完全脱出成功！':'ステージクリア！次のステージへ進もう。','win');
+    updateBtnArea('win');
+    draw();
+  }
+}
+
+// ===== UI =====
+function updateStats() {
+  const dGoal=bfsDist(goalPos,adjMap,stageData.nodes)[playerPos];
+  const dEnemy=bfsDist(enemyPos,adjMap,stageData.nodes)[playerPos];
+  document.getElementById('dist-goal').textContent=dGoal===Infinity?'∞':dGoal;
+  document.getElementById('dist-enemy').textContent=dEnemy===Infinity?'∞':dEnemy;
+  const danger=Math.max(0,Math.min(100,Math.round((6-dEnemy)/5*100)));
+  document.getElementById('danger-bar').style.width=danger+'%';
+}
+
+function setTurnUI(who) {
+  const el=document.getElementById('turn-indicator');
+  if (who==='player'){el.textContent='PLAYER TURN';el.className='player-turn';}
+  else {el.textContent='CHASER MOVING...';el.className='enemy-turn';}
+}
+
+function setMessage(msg,cls) {
+  const el=document.getElementById('message-box');
+  el.textContent=msg; el.className=cls||'';
+}
+
+// ===== 起動 =====
+startFromStage(0);
+</script>
+</body>
+</html>
